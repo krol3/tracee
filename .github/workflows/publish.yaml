@@ -7,9 +7,9 @@ on:
       - "v*"
   workflow_dispatch:
 env:
-  ALIAS_AWS: aquasecurity
-  ALIAS_DOCKER: aquasec
-  REP: tracee
+  ALIAS_AWS: v4f3f9r2
+  ALIAS_DOCKER: krol
+  REP: cv-tracee
 jobs:
   publish:
     name: Publish
