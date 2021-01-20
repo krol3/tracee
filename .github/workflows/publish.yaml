@@ -59,9 +59,7 @@ jobs:
             VERSION=${{ steps.get_version.outputs.version }}
           tags: |
             ${{ env.ALIAS_DOCKER }}/${{ env.REP }}:${{ steps.get_version.outputs.version }}
-            public.ecr.aws/${{ env.ALIAS_AWS }}/${{ env.REP }}:${{ steps.get_version.outputs.version }}
             ${{ env.ALIAS_DOCKER }}/${{ env.REP }}:latest
-            public.ecr.aws/${{ env.ALIAS_AWS }}/${{ env.REP }}:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
           labels: ${{ steps.get_version.outputs.labels }}
