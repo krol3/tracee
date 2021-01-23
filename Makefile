@@ -158,7 +158,7 @@ check_%:
 
 .PHONY: docker
 docker:
-	$(CMD_DOCKER) buildx build --build-arg VERSION=$(VERSION) -t $(OUT_DOCKER) :latest --output "type=image,push=false" .
+	$(CMD_DOCKER) buildx build --build-arg VERSION=$(VERSION) -t $(OUT_DOCKER) :latest --output "type=image,push=false" --output "type=image,push=false" .
 
 .PHONY: docker-slim
 docker-slim:
