@@ -44,7 +44,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-buildx-
 
-      - name: Build and push with Docker Buildx
+      - name: Build with Docker Buildx
         id: docker_build
         uses: docker/build-push-action@v2
         with:
@@ -52,8 +52,8 @@ jobs:
           tags: tracee-builder:latest
           file: ./Dockerfile.builder
 
-      - name: Build Tracee
-        run: make all DOCKER=1
+      - name: Run Builder Tracee
+        run: docker run --rm -v /usr/src:/usr/src/ -v /home/runner/work/tracee/tracee:/tracee --entrypoint make tracee-builder KERN_BLD_PATH=/usr/src/linux-headers-5.4.0-1032-azure KERN_SRC_PATH=/usr/src/linux-headers-5.4.0-1032-azure
 
   test:
     runs-on: ubuntu-20.04
