@@ -3,7 +3,7 @@ name: build-test
 on: pull_request
 
 jobs:
-  build:
+  build-test:
     runs-on: ubuntu-20.04
 
     env:
@@ -54,13 +54,6 @@ jobs:
 
       - name: Build Tracee
         run: make all DOCKER=1
-
-  test:
-    runs-on: ubuntu-20.04
-
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@v2
 
       - name: Run Tests
         run: make test DOCKER=1
