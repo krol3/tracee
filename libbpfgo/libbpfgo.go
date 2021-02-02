@@ -164,7 +164,9 @@ err_out:
 import "C"
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"strings"
 	"syscall"
 	"unsafe"
@@ -250,7 +252,7 @@ func NewModuleFromBuffer(bpfObjBuff []byte, bpfObjName string) (*Module, error) 
 	C.free(unsafe.Pointer(name))
 	C.free(unsafe.Pointer(buffPtr))
 	if obj == nil {
-		return nil, fmt.Errorf("failed to open BPF object %s: %v...", bpfObjName, bpfObjBuff[:20])
+		return nil, fmt.Errorf("failed to open BPF object %s: %v", bpfObjName, bpfObjBuff[:20])
 	}
 
 	return &Module{
@@ -302,6 +304,42 @@ func (m *Module) GetMap(mapName string) (*BPFMap, error) {
 	}, nil
 }
 
+func (b *BPFMap) Pin(pinPath string) error {
+	cs := C.CString(b.name)
+	path := C.CString(pinPath)
+	bpfMap := C.bpf_object__find_map_by_name(b.module.obj, cs)
+	errC := C.bpf_map__pin(bpfMap, path)
+	C.free(unsafe.Pointer(cs))
+	if errC != 0 {
+		return fmt.Errorf("failed to pin map %s to path %s", b.name, pinPath)
+	}
+	return nil
+}
+
+func (b *BPFMap) Unpin(pinPath string) error {
+	cs := C.CString(b.name)
+	path := C.CString(pinPath)
+	bpfMap := C.bpf_object__find_map_by_name(b.module.obj, cs)
+	errC := C.bpf_map__unpin(bpfMap, path)
+	C.free(unsafe.Pointer(cs))
+	if errC != 0 {
+		return fmt.Errorf("failed to unpin map %s from path %s", b.name, pinPath)
+	}
+	return nil
+}
+
+func (b *BPFMap) SetPinPath(pinPath string) error {
+	cs := C.CString(b.name)
+	path := C.CString(pinPath)
+	bpfMap := C.bpf_object__find_map_by_name(b.module.obj, cs)
+	errC := C.bpf_map__set_pin_path(bpfMap, path)
+	C.free(unsafe.Pointer(cs))
+	if errC != 0 {
+		return fmt.Errorf("failed to set pin for map %s to path %s", b.name, pinPath)
+	}
+	return nil
+}
+
 func GetUnsafePointer(data interface{}) (unsafe.Pointer, error) {
 	var dataPtr unsafe.Pointer
 	if k, isType := data.(int8); isType {
@@ -319,7 +357,7 @@ func GetUnsafePointer(data interface{}) (unsafe.Pointer, error) {
 	} else if k, isType := data.([]byte); isType {
 		dataPtr = unsafe.Pointer(&k[0])
 	} else {
-		return nil, fmt.Errorf("Unknown data type %T", data)
+		return nil, fmt.Errorf("unknown data type %T", data)
 	}
 
 	return dataPtr, nil
@@ -609,9 +647,37 @@ func (pb *PerfBuffer) poll() error {
 				if syscall.Errno(-err) == syscall.EINTR {
 					continue
 				}
-				return fmt.Errorf("Error polling perf buffer: %d", err)
+				return fmt.Errorf("error polling perf buffer: %d", err)
 			}
 		}
 	}
 	return nil
+}
+
+// TracePrint reads data from the trace pipe that bpf_trace_printk() writes to,
+// and writes it to stdout. The pipe is global, so this function is not
+// associated with any BPF program. It is recommended to use bpf_trace_printk()
+// and this function for debug purposes only.
+// This is a blocking function intended to be called from a goroutine, for example:
+//		go libbpfgo.TracePrint()
+func TracePrint() {
+	f, err := os.Open("/sys/kernel/debug/tracing/trace_pipe")
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "TracePrint failed to open trace pipe: %v", err)
+		return
+	}
+	defer f.Close()
+
+	r := bufio.NewReader(f)
+	b := make([]byte, 1024)
+	for {
+		len, err := r.Read(b)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, "TracePrint failed to read from trace pipe: %v", err)
+			return
+		}
+
+		s := string(b[:len])
+		fmt.Println(s)
+	}
 }

@@ -1,12 +1,19 @@
----
-name: build-test
-on: pull_request
+name: pr-ebpf
+on: 
+  pull_request:
+    paths: 
+      - "tracee-ebpf/**"
 jobs:
-  build:
+  build-test:
     runs-on: ubuntu-20.04
+    defaults:
+      run:
+        working-directory: tracee-ebpf
     steps:
       - name: Checkout Code
         uses: actions/checkout@v2
+        with:
+          submodules: true
       - name: Lint
         run: |
           if test -z "$(gofmt -l .)"; then
@@ -16,7 +23,6 @@ jobs:
             gofmt -s -d .
             exit 1
           fi
-
       - name: setting buildxs
         uses: docker/setup-buildx-action@v1
         id: buildx
@@ -35,11 +41,11 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: false
-          file: ./Dockerfile.builder
+          file: ./tracee-ebpf/Dockerfile.builder
           load: true
           tags: tracee-builder:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
-      - name: Run Tests
+      - name: Test
         run: make test DOCKER=1
