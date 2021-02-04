@@ -1,4 +1,4 @@
-![Tracee Logo](../images/tracee.png)
+![Tracee Logo](../images/tracee.png) TESTE
 
 # Tracee-eBPF: Linux Tracing and Forensics using eBPF - TEST
 
