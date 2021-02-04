@@ -41,11 +41,12 @@ jobs:
         uses: docker/build-push-action@v2
         with:
           push: false
-          file: ./Dockerfile.builder
+          file: ./tracee-ebpf/Dockerfile.builder
           load: true
           tags: tracee-builder:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
       - name: Test
-        run: make test DOCKER=1
+        run: |
+          make test DOCKER=1
