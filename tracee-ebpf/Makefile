@@ -128,8 +128,8 @@ ifndef DOCKER
 test: $(GO_SRC) $(LIBBPF_HEADERS) $(LIBBPF_OBJ)
 	$(go_env)	go test -v ./...
 else
-test: $(DOCKER_BUILDER)
-	$(call docker_builder_make,test)
+test: #$(DOCKER_BUILDER)
+	$(call docker_builder_make,$@)
 endif
 
 .PHONY: $(DOCKER_BUILDER)
