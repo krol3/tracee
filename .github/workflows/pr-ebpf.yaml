@@ -47,6 +47,7 @@ jobs:
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
           outputs: type=docker
+          platforms: linux/amd64
 
       - name: Test
         run: DOCKER_BUILDKIT=1 make test DOCKER=1
