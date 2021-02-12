@@ -46,6 +46,7 @@ jobs:
           tags: tracee-builder:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
+          outputs: type=docker
 
       - name: Test
         run: make test DOCKER=1
