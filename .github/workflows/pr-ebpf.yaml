@@ -41,7 +41,7 @@ jobs:
         with:
           push: false
           file: ./tracee-ebpf/Dockerfile.builder
-          load: true
+          #load: true
           builder: ${{ steps.buildx.outputs.name }}
           tags: tracee-builder:latest
           cache-from: type=local,src=/tmp/.buildx-cache
