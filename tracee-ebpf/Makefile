@@ -121,7 +121,7 @@ ifndef DOCKER
 test: $(GO_SRC) $(LIBBPF_HEADERS) $(LIBBPF_OBJ)
 	$(go_env)	go test -v ./...
 else
-test: #$(DOCKER_BUILDER)
+test:
 	$(call docker_builder_make,$@)
 endif
 
