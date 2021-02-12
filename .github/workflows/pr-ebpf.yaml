@@ -49,4 +49,4 @@ jobs:
           outputs: type=docker
 
       - name: Test
-        run: make test DOCKER=1
+        run: DOCKER_BUILDKIT=1 make test DOCKER=1
