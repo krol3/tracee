@@ -9,9 +9,10 @@ import (
 	"time"
 
 	"github.com/aquasecurity/tracee/tracee-rules/types"
+	tracee "github.com/aquasecurity/tracee/tracee/external"
 )
 
-func setupOuput(webhook string) (chan types.Finding, error) {
+func setupOutput(webhook string) (chan types.Finding, error) {
 	out := make(chan types.Finding)
 	go func() {
 		for res := range out {
@@ -25,6 +26,7 @@ func setupOuput(webhook string) (chan types.Finding, error) {
 				resp, err := http.Post(webhook, "application/json", strings.NewReader(payload))
 				if err != nil {
 					log.Printf("error calling webhook for %v: %v", res, err)
+					continue
 				}
 				resp.Body.Close()
 			}
@@ -48,7 +50,7 @@ func prepareJSONPayload(res types.Finding) (string, error) {
 		return "", err
 	}
 	fields := make(map[string]interface{})
-	if te, ok := res.Context.(types.TraceeEvent); ok {
+	if te, ok := res.Context.(tracee.Event); ok {
 		fields["value"] = te.ReturnValue
 	}
 	payload := Payload{

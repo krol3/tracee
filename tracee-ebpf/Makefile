@@ -7,19 +7,17 @@ CMD_CLANG ?= clang
 CMD_LLVM_STRIP ?= llvm-strip
 CMD_DOCKER ?= docker
 CMD_GIT ?= git
-CMD_CHECKSUM ?= sha256sum
-CMD_GITHUB ?= gh
 # environment:
 ARCH_UNAME := $(shell uname -m)
 ARCH ?= $(ARCH_UNAME:aarch64=arm64)
 KERN_RELEASE ?= $(shell uname -r)
 KERN_BLD_PATH ?= $(if $(KERN_HEADERS),$(KERN_HEADERS),/lib/modules/$(KERN_RELEASE)/build)
 KERN_SRC_PATH ?= $(if $(KERN_HEADERS),$(KERN_HEADERS),$(if $(wildcard /lib/modules/$(KERN_RELEASE)/source),/lib/modules/$(KERN_RELEASE)/source,$(KERN_BLD_PATH)))
-VERSION ?= $(if $(RELEASE_TAG),$(RELEASE_TAG),$(shell $(CMD_GIT) describe --tags))
+VERSION ?= $(if $(RELEASE_TAG),$(RELEASE_TAG),$(shell $(CMD_GIT) describe --tags 2>/dev/null || echo '0'))
 # inputs and outputs:
 OUT_DIR ?= dist
 GO_SRC := $(shell find . -type f -name '*.go')
-OUT_BIN := $(OUT_DIR)/tracee
+OUT_BIN := $(OUT_DIR)/tracee-ebpf
 BPF_SRC := tracee/tracee.bpf.c 
 OUT_BPF := $(OUT_DIR)/tracee.bpf.$(subst .,_,$(KERN_RELEASE)).$(subst .,_,$(VERSION)).o
 BPF_HEADERS := 3rdparty/include
@@ -34,10 +32,6 @@ DOCKER_BUILDER_KERN_BLD ?= $(if $(shell readlink $(KERN_BLD_PATH)),$(shell readl
 DOCKER_BUILDER_KERN_SRC ?= $(if $(shell readlink $(KERN_SRC_PATH)),$(shell readlink $(KERN_SRC_PATH)),$(KERN_SRC_PATH))
 # DOCKER_BUILDER_KERN_SRC_MNT is the kernel headers directory to mount into the docker builder container. DOCKER_BUILDER_KERN_SRC should usually be a decendent of this path.
 DOCKER_BUILDER_KERN_SRC_MNT ?= $(dir $(DOCKER_BUILDER_KERN_SRC))
-RELEASE_ARCHIVE := $(OUT_DIR)/tracee.tar.gz
-RELEASE_CHECKSUMS := $(OUT_DIR)/checksums.txt
-RELEASE_DOCKER ?= aquasec/tracee
-RELEASE_DOCKER_TAG ?= $(RELEASE_TAG:v%=%)
 
 $(OUT_DIR):
 	mkdir -p $@
@@ -52,7 +46,7 @@ $(OUT_BIN): $(LIBBPF_HEADERS) $(LIBBPF_OBJ) $(filter-out *_test.go,$(GO_SRC)) $(
 	-ldflags "-X main.bpfBundleInjected=$$(base64 -w 0 $(BPF_BUNDLE)) -X main.version=$(VERSION)"	
 else 
 $(OUT_BIN): $(DOCKER_BUILDER) | $(OUT_DIR)
-	$(call docker_builder_make,$($@))
+	$(call docker_builder_make,$@ VERSION=$(VERSION))
 endif
 
 bpf_compile_tools = $(CMD_LLC) $(CMD_CLANG)
@@ -79,7 +73,7 @@ bpf: $(OUT_BPF)
 
 linux_arch := $(ARCH:x86_64=x86)
 ifndef DOCKER
-$(OUT_BPF): $(BPF_SRC) $(LIBBPF_HEADERS) | $(OUT_DIR) $(bpf_compile_tools)
+$(OUT_DIR)/tracee.bpf.%.o: $(BPF_SRC) $(LIBBPF_HEADERS) | $(OUT_DIR) $(bpf_compile_tools)
 	@v=$$($(CMD_CLANG) --version); test $$(echo $${v#*version} | head -n1 | cut -d '.' -f1) -ge '9' || (echo 'required minimum clang version: 9' ; false)
 	$(CMD_CLANG) -S \
 		-D__BPF_TRACING__ \
@@ -102,7 +96,7 @@ $(OUT_BPF): $(BPF_SRC) $(LIBBPF_HEADERS) | $(OUT_DIR) $(bpf_compile_tools)
 		-Wno-deprecated-declarations \
 		-Wno-gnu-variable-sized-type-not-at-end \
 		-Wno-pointer-sign \
-		-Wno-pragma-once-outside-heade \
+		-Wno-pragma-once-outside-header \
 		-Wno-unknown-warning-option \
 		-Wno-unused-value \
 		-Wunused \
@@ -119,9 +113,8 @@ $(OUT_BPF): $(BPF_SRC) $(LIBBPF_HEADERS) | $(OUT_DIR) $(bpf_compile_tools)
 	rm $(@:.o=.ll)
 else
 $(OUT_BPF): $(DOCKER_BUILDER) | $(OUT_DIR) 
-	$(call docker_builder_make,$($@))
+	$(call docker_builder_make,$@)
 endif
-
 
 .PHONY: test 
 ifndef DOCKER
@@ -132,26 +125,30 @@ test: #$(DOCKER_BUILDER)
 	$(call docker_builder_make,$@)
 endif
 
-.PHONY: $(DOCKER_BUILDER)
 # record built image id to prevent unnecessary building and for cleanup
-$(DOCKER_BUILDER): $(OUT_DIR)/$(DOCKER_BUILDER)
-
-$(OUT_DIR)/$(DOCKER_BUILDER): $(GO_SRC) $(BPF_SRC) $(MAKEFILE_LIST) Dockerfile | $(OUT_DIR)
-	$(CMD_DOCKER) build -f Dockerfile.builder -t $(DOCKER_BUILDER) --iidfile $(OUT_DIR)/$(DOCKER_BUILDER) --target builder .
+docker_builder_file := $(OUT_DIR)/$(DOCKER_BUILDER)
+.PHONY: $(DOCKER_BUILDER)
+$(DOCKER_BUILDER) $(docker_builder_file) &: Dockerfile.builder | $(OUT_DIR) check_$(CMD_DOCKER)
+	$(CMD_DOCKER) build -t $(DOCKER_BUILDER) --iidfile $(docker_builder_file) - < $<
 
 # docker_builder_make runs a make command in the tracee-builder container
 define docker_builder_make
 	$(CMD_DOCKER) run --rm \
 	-v $(abspath $(DOCKER_BUILDER_KERN_SRC_MNT)):$(DOCKER_BUILDER_KERN_SRC_MNT) \
-	-v $(abspath .):/tracee \
+	-v $(abspath .):/tracee/tracee-ebpf \
+	-w /tracee/tracee-ebpf \
 	--entrypoint make $(DOCKER_BUILDER) KERN_BLD_PATH=$(DOCKER_BUILDER_KERN_BLD) KERN_SRC_PATH=$(DOCKER_BUILDER_KERN_SRC) $(1)
 endef
 
+.PHONY: mostlyclean
+mostlyclean:
+	-rm -rf $(OUT_BIN) $(bpf_bundle_dir) $(OUT_BPF) $(BPF_BUNDLE)
+
 .PHONY: clean
 clean:
-	-$(CMD_DOCKER) rmi $(file < $(DOCKER_BUILDER))
+	-$(CMD_DOCKER) rmi $(file < $(docker_builder_file))
 	-rm -rf dist $(OUT_DIR)
-	-cd $(LIBBPF_SRC) && $(MAKE) clean;
+	$(MAKE) -C $(LIBBPF_SRC) clean
 	
 check_%:
 	@command -v $* >/dev/null || (echo "missing required tool $*" ; false)
@@ -163,31 +160,3 @@ docker:
 .PHONY: docker-slim
 docker-slim:
 	$(CMD_DOCKER) build --build-arg VERSION=$(VERSION) -t $(OUT_DOCKER):slim --build-arg BASE=slim .
-
-# release_docker_image accepts a local docker image reference (first argument), pushes it under a new name  (second argument) to remote repository, and records it in the release notes
-define release_docker_image
-	$(CMD_DOCKER) tag $(1) $(2) && $(CMD_DOCKER) push $(2) &&	echo '- `docker pull docker.io/$(2)`' >> $(release_notes);
-endef
-
-$(RELEASE_ARCHIVE) $(RELEASE_CHECKSUMS) &: $(OUT_BIN) LICENSE | $(OUT_DIR) check_$(CMD_CHECKSUM)
-	tar -czf $(RELEASE_ARCHIVE) $(OUT_BIN) LICENSE
-	$(CMD_CHECKSUM) $(RELEASE_ARCHIVE) > $(RELEASE_CHECKSUMS)
-
-release_notes := $(OUT_DIR)/release-notes.txt
-release_images_fat := $(RELEASE_DOCKER):latest $(RELEASE_DOCKER):$(RELEASE_DOCKER_TAG)
-release_images_slim := $(RELEASE_DOCKER):slim $(RELEASE_DOCKER):slim-$(RELEASE_DOCKER_TAG)
-.PHONY: release
-# before running this rule, need to authenticate git, gh, and docker tools.
-release: | check_$(CMD_GITHUB) $(RELEASE_ARCHIVE) $(RELEASE_CHECKSUMS) docker docker-slim
-	test -n '$(RELEASE_TAG)' || (echo "missing required variable RELEASE_TAG" ; false)
-	-rm $(release_notes)
-	echo '## Changelog' > $(release_notes)
-	$(CMD_GIT) log --pretty=oneline --abbrev=commit --no-decorate --no-color tags/$(shell $(CMD_GIT) describe --tags --abbrev=0)..HEAD >> $(release_notes)
-	echo '' >> $(release_notes)
-	echo '## Docker images' >> $(release_notes)
-	$(foreach img,$(release_images_fat),$(call release_docker_image,$(OUT_DOCKER):latest,$(img)))
-	$(foreach img,$(release_images_slim),$(call release_docker_image,$(OUT_DOCKER):slim,$(img)))
-	echo '' >>$(release_notes)
-	$(CMD_GIT) tag $(RELEASE_TAG)
-	$(CMD_GIT) push origin $(RELEASE_TAG)
-	$(CMD_GITHUB) release create $(RELEASE_TAG) $(RELEASE_ARCHIVE) $(RELEASE_CHECKSUMS) --title $(RELEASE_TAG) --notes-file $(release_notes)
