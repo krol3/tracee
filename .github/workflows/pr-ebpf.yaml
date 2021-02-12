@@ -1,7 +1,7 @@
 name: pr-ebpf
-on: 
+on:
   pull_request:
-    paths: 
+    paths:
       - "tracee-ebpf/**"
 jobs:
   build-test:
@@ -28,7 +28,6 @@ jobs:
         id: buildx
         with:
           install: true
-
       - name: Cache Docker layers
         uses: actions/cache@v2
         with:
@@ -43,6 +42,7 @@ jobs:
           push: false
           file: ./tracee-ebpf/Dockerfile.builder
           load: true
+          builder: ${{ steps.buildx.outputs.name }}
           tags: tracee-builder:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
