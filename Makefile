@@ -2,7 +2,7 @@ OUT_DIR ?= dist
 OUT_DOCKER ?= tracee
 OUT_ARCHIVE := $(OUT_DIR)/tracee.tar.gz
 OUT_CHECKSUMS := $(OUT_DIR)/checksums.txt
-PUSH_DOCKER_REPO ?= aquasec/tracee
+PUSH_DOCKER_REPO ?= krol3/tracee
 PUSH_DOCKER_TAG ?= $(RELEASE_TAG:v%=%)
 RELEASE_FILES := LICENSE $(OUT_DIR)/tracee-ebpf $(OUT_DIR)/tracee-rules $(OUT_DIR)/rules
 # RELEASE_TAG must be set for the release target
