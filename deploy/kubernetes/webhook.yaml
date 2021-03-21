@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: webhook
+  name: webhook
+spec:
+  selector:
+    matchLabels:
+      app: webhook
+  template:
+    metadata:
+      labels:
+        app: webhook
+      name: webhook
+    spec:
+      containers:
+      - name: webhook
+        image: falcosecurity/falcosidekick
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 2801
+        args: ["-c","/app/config/cfg.yaml"]
+        volumeMounts:
+          - name: webhook-volume
+            mountPath: /app/config
+      volumes:
+        - configMap:
+            name: webhook-config
+          name: webhook-volume
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: webhook
+spec:
+  ports:
+  - name: http
+    port: 2801
+  selector:
+    app: webhook
+
