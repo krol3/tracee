@@ -1,9 +1,6 @@
 # Deploy Tracee on Kubernetes
 
-> NOTE `Minimal Requirements to run tracee in the node`
-````
-https://aquasecurity.github.io/tracee/install/prerequisites/
-````
+> NOTE This approach assumes that kernel headers are available on the Kubernetes nodes under conventional location, e.g /usr/src and /lib/modules. More details about [Minimal Requirements to run tracee in the Kubernetes nodes](https://aquasecurity.github.io/tracee/install/prerequisites/)
 
 1. Create a ConfigMap that will hold the templates files for tracee-rules
  ``` bash
@@ -20,7 +17,7 @@ https://aquasecurity.github.io/tracee/install/prerequisites/
 > NOTE `See the complete config file in` [falcosidekick](https://github.com/falcosecurity/falcosidekick)
 
  ``` bash
- kubectl create configmap webhook-config --from-file=cfg.yaml
+ kubectl create configmap tracee-webhook-config --from-file=cfg.yaml
  ```
 
 4. Create the webhook deployment and service for the falcosidekick.
@@ -31,5 +28,5 @@ https://aquasecurity.github.io/tracee/install/prerequisites/
 
 > Get the service to integrate with tracee.  `kubectl get service`
 ````
-https://webhook.default.svc.cluster.local:2801
+https://tracee-webhook.default.svc.cluster.local:2801
 ````

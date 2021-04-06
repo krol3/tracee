@@ -2,16 +2,21 @@ apiVersion: apps/v1
 kind: DaemonSet
 metadata:
   labels:
-    app: tracee
+    app.kubernetes.io/name: tracee
+    app.kubernetes.io/instance: tracee-v1
+    app.kubernetes.io/version: "v0.5.0"
+    app.kubernetes.io/component: database
+    app.kubernetes.io/part-of: tracee
+    app.kubernetes.io/managed-by: aquasecurity
   name: tracee
 spec:
   selector:
     matchLabels:
-      app: tracee
+      app.kubernetes.io/name: tracee
   template:
     metadata:
       labels:
-        app: tracee
+        app.kubernetes.io/name: tracee
       name: tracee
     spec:
       containers:
@@ -21,14 +26,10 @@ spec:
         - name: WEBHOOK_URL
           value: http://webhook:2801
         args:
-          - ./tracee-ebpf --output=format:gob | ./tracee-rules --input-tracee=file:stdin
-            --input-tracee=format:gob --webhook $WEBHOOK_URL --webhook-template /templates/falcosidekick.tmpl --webhook-content-type application/json
+          - --webhook $WEBHOOK_URL --webhook-template /templates/falcosidekick.tmpl --webhook-content-type application/json
         command:
           - /bin/sh
           - -c
-        ports:
-        - containerPort: 8096
-          protocol: TCP
         name: tracee
         securityContext:
           privileged: true
