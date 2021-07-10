@@ -48,4 +48,5 @@ jobs:
           cache-to: type=local,dest=/tmp/.buildx-cache,mode=max
 
       - name: Test
-        run: make test DOCKER=1
+        run: |
+          make test DOCKER=1
